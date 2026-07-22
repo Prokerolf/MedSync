@@ -1,8 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { db } from "../firebase";
+import { doc, getDoc, setDoc, increment } from "firebase/firestore";
 
 export default function Login({ onLogin }) {
   const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
+  const [visits, setVisits] = useState(0);
+
+  useEffect(() => {
+    const trackAndFetchVisits = async () => {
+      try {
+        const statsRef = doc(db, 'stats', 'usage');
+        // Increment visit if not done in this session
+        if (!sessionStorage.getItem('medsync_visited')) {
+          await setDoc(statsRef, { visits: increment(1) }, { merge: true });
+          sessionStorage.setItem('medsync_visited', 'true');
+        }
+        
+        // Fetch current visits
+        const docSnap = await getDoc(statsRef);
+        if (docSnap.exists()) {
+          setVisits(docSnap.data().visits || 0);
+        } else {
+          setVisits(1);
+        }
+      } catch (err) {
+        console.warn("Could not fetch stats, maybe missing firebase config", err);
+      }
+    };
+    trackAndFetchVisits();
+  }, []);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -50,6 +77,18 @@ export default function Login({ onLogin }) {
             <i className="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
           </button>
         </form>
+
+        {/* Public Usage Statistics */}
+        <div style={{ marginTop: 40, padding: 24, background: '#f8fafc', borderRadius: 16, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--primary)' }}>
+            <i className="fa-solid fa-chart-line"></i>
+            <h3 style={{ fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }}>สถิติการเข้าใช้งาน</h3>
+          </div>
+          <div style={{ fontSize: 36, fontWeight: '900', color: '#0f172a', display: 'flex', alignItems: 'baseline', gap: 4 }}>
+            {visits > 0 ? visits.toLocaleString() : '-'} <span style={{ fontSize: 14, color: '#64748b', fontWeight: 'normal' }}>ครั้ง</span>
+          </div>
+          <p style={{ fontSize: 12, color: '#94a3b8' }}>จำนวนเพื่อนๆ ที่เข้ามาใช้งานแพลตฟอร์มนี้</p>
+        </div>
       </div>
     </div>
   );
